@@ -1,0 +1,756 @@
+---
+title: "Advanced Statistical Modeling For Big Data - Airbnb Roma"
+author: "Massimiliano Pastorino"
+output: html_document
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+<html>
+<head>
+<style>
+body {
+  background-color: 	silver;
+  text-align: justify;
+}
+</style>
+</head>
+</html>
+
+<h1 class="title toc-ignore">Indice</h1>
+
+<div id="TOC">
+<li><a href="#Introduzione">Introduzione</a></li>
+
+<li><a href="#EDA">Analisi esplorativa dei dati (EDA)</a></li>
+
+<li><a href="#POSITIVE">Positive continuous data</a></li>
+
+<ul>
+
+<li><a href="#GAMMA">Gamma regression</a></li>
+
+<li><a href="#INTERPRETAZIONE">Interpretazione dei coefficienti</a></li>
+
+<li><a href="#VALIDAZIONE">Validazione</a></li>
+
+
+<li><a href="#INVERSE">Inverse Gaussian regression</a></li>
+
+<ul>
+
+<li><a href="#INTERPRETAZIONE_INVERSE">Interpretazione dei coefficienti</a></li>
+
+<li><a href="#VALIDAZIONE_INVERSE">Validazione-Confronto tra regressione Gamma e Inversa Gaussiana</a></li>
+
+<li><a href="#MARGINAL">Marginal effects</a></li>
+</ul>
+</ul>
+</div>
+
+<div id="Introduzione" class="section level1">
+
+
+# Introduzione
+
+Il caso studio in esame riguarda l'analisi del dataset "Aemf1" reperibile al seguente link: https://www.kaggle.com/datasets/dipeshkhemani/airbnb-cleaned-europe-dataset. Lo scopo è quello di prevedere il prezzo di prenotazione per gli airbnb di Roma sulla base di una serie di variabili sia di tipo numerico sia di tipo categoriale.
+
+Nella prima parte del caso studio verranno analizzate alcune delle variabili presenti nel dataset, attraverso l'analisi e la visualizzazione dei dati (EDA) capiremo come la variabile dipendente Prezzo è influenzata dalle principali variabili indipendenti presenti nel dataset di riferimento.
+
+Nella seconda parte del caso studio verranno stimati dei modelli glm considerando le opprtune distribuzioni appartenenti alla famiglia esponenziale che meglio si adattano alla risoluzione del nostro problema. 
+
+I modelli verranno validati considerando dei dati unseen, inoltre le varie metriche di performance prese in considerazione ci diranno quale modello si adatta meglio all'obbiettivo del caso studio, ovvero la previsione del prezzo di prenotazione per gli airbnb di Roma.
+
+</div>
+
+```{r,include=FALSE, warning=FALSE, message=FALSE}
+library(readr)
+Aemf1 <- read_csv("C:/Users/massi/OneDrive/Desktop/Unisa/Magistrale/2° Anno/1°  Semestre/Advanced Statistical Modeling For Big Data/Progetti/Aemf1.csv")
+library(tidyverse)
+airbnb_Rome <- Aemf1%>%
+  filter(City == "Rome") ## 9027 x 19
+```
+
+
+
+```{r,include=FALSE, warning=FALSE, message=FALSE}
+# str(airbnb_Rome) # Struttura del dataset 
+```
+
+
+
+
+```{r,include=FALSE, warning=FALSE, message=FALSE}
+# table(is.na(airbnb_Rome)) # * Ci sono valori mancanti? (na) -> NO
+```
+
+
+```{r,include=FALSE, warning=FALSE, message=FALSE}
+# table(duplicated(airbnb_Rome)) ## * Ci sono osservazioni duplicate? ->  N0
+```
+
+
+
+```{r,include=FALSE, warning=FALSE, message=FALSE}
+airbnb_Rome$City <- NULL
+airbnb_Rome$`Shared Room` <- NULL
+airbnb_Rome$`Private Room` <- NULL
+
+airbnb_Rome <- airbnb_Rome%>%
+  dplyr::select(-c(`Normalised Attraction Index`,`Normalised Restraunt Index`))%>%
+  mutate(Day = factor(Day),
+         `Room Type` = factor(`Room Type`),
+        Superhost = factor(Superhost),
+         `Multiple Rooms` = factor(`Multiple Rooms`),
+         Business = factor(Business)
+  ) 
+
+```
+
+
+
+
+```{r,include=FALSE, warning=FALSE, message=FALSE}
+
+airbnb_Rome <- airbnb_Rome %>%
+  mutate(Bedrooms = case_when(
+    Bedrooms == 0 ~ factor("0"),
+    Bedrooms == 1 ~ factor("1"),
+    TRUE ~ factor(">1" )
+  ))
+
+
+airbnb_Rome <- airbnb_Rome %>%
+  mutate(`Person Capacity` = case_when(
+    `Person Capacity` == 2 ~ factor("2"),
+    `Person Capacity` == 3 ~ factor("3"),
+    TRUE ~ factor(">3") 
+  ))
+
+
+airbnb_Rome <- airbnb_Rome %>%
+  mutate(`Cleanliness Rating` = case_when(
+    `Cleanliness Rating` >=2 & `Cleanliness Rating` <=5 ~ factor("Insufficient"),
+   `Cleanliness Rating` >5 &  `Cleanliness Rating` <=8 ~ factor("Sufficient/Medium"),
+    TRUE ~ factor("Very Good")
+  ))
+
+```
+
+
+```{r,include=FALSE, warning=FALSE, message=FALSE}
+# summary(airbnb_Rome$`City Center (km)`)
+
+limiti_intervalli <- c(0,3,6,10)
+
+airbnb_Rome$`City Center (km)` <- cut(airbnb_Rome$`City Center (km)`, breaks = limiti_intervalli, include.lowest = TRUE)
+
+# table(airbnb_Rome$`City Center (km)`)
+
+
+```
+
+
+```{r,include=FALSE, warning=FALSE, message=FALSE}
+#str(airbnb_Rome)
+#View(airbnb_Rome)
+```
+
+
+
+```{r,include=FALSE, warning=FALSE, message=FALSE}
+set.seed(300399)
+airbnb_Rome_mescolato <- airbnb_Rome[sample(nrow(airbnb_Rome)), ]
+# Rimuovere i numeri di osservazione
+row.names(airbnb_Rome_mescolato) <- NULL
+
+```
+
+```{r,include=FALSE, warning=FALSE, message=FALSE}
+# View(airbnb_Rome_mescolato)
+```
+
+
+<div id="EDA" class="section level1">
+
+# Analisi esplorativa dei dati  (EDA)
+
+La variabile dipendente Price è di tipo numerico quindi è bene vedere come essa si distribuisce grazie ad un'istogramma. Dall'istogramma notiamo che il prezzo medio degli airbnb di Roma si aggira intorno a 205 euro.
+
+La distribuzione è asimmetrica positiva, la maggioranza degli airbnb presenta dei prezzi che sono inferiori alla cifra di 500 euro.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+library(ggplot2)
+library(ggtext)
+## Inizio Analisi Esplorativa-Descrittiva
+
+## Variabile dipendente -> Price
+
+## Primo grafico: Plotto la variabile price
+
+
+media_price <- round(mean(airbnb_Rome_mescolato$Price), 0)
+
+hist_1 <- ggplot(airbnb_Rome_mescolato, aes(x = Price)) +
+  geom_histogram(bins = 30) + 
+  geom_segment(
+    x = media_price, xend = media_price,
+    y = 0, yend = max(airbnb_Rome_mescolato$Price),
+    color = "red", lwd=1
+  ) +
+  geom_text(
+    x = 500, y = 3000,
+    label = paste("Media:\t", media_price,"€"),
+    color = "red"
+  ) + theme_bw() + xlab("Prezzo in euro") + ylab("Frequenza Assoluta") + ggtitle("Distribuzione dei prezzi degli Airbnb di Roma") +  labs(caption="Figura 1: Istogramma della distribuzione della variabile Prezzo")  + theme(plot.caption=element_markdown(hjust=0)) 
+
+hist_1
+```
+
+Dato che nel dataset in esame sono presenti alcune variabili numeriche, è utile individuare eventuali legami lineari e quindi osservare la correlazione per capire quanto è intenso tale legame lineare se presente.
+
+Come possiamo vedere dal grafico, il prezzo è correlato positivamente con le variabili esplicative prese in considerazione. L'intensità del legame lineare tra Price e Guest Satisfaction e tra Price e Metro Distance (km) è debole mentre l'intensità del legame lineare tra Price e Attraction Index e tra Price e Restraunt Index è moderata.
+
+Per quanto riguarda la correlazione tra le diverse variabili esplicative, notiamo che solo la correlazione tra Attraction Index e Restraunt Index è molto forte, il resto delle variabili esplicative presentano una modesta correlazione.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+library(dplyr)
+GGally::ggpairs(airbnb_Rome_mescolato%>% dplyr::select(Price,`Guest Satisfaction`, `Metro Distance (km)`, `Attraction Index`, `Restraunt Index`)) + labs(caption="Figura 2: Grafico delle correlazioni delle variabili numeriche")  + theme(plot.caption=element_markdown(hjust=0))
+
+```
+
+
+Durante l'analisi esplorativa, è utile selezionare alcune delle variabili categoriali presenti nel dataset per vedere come esse incidono sul prezzo degli airbnb.
+
+Ad esempio prendiamo in considerazione la variabile categoriale Day e vediamo come varia la densità dei prezzi.
+
+Dal grafico notiamo che le due densità sono molto simili, sembra che prenotare un airbnb durante il weekend o in settimana non incida di molto sul prezzo.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+
+ggplot(airbnb_Rome_mescolato, aes(x = Price, fill = Day)) +
+  geom_density(alpha = 0.5) +
+  theme_bw() + xlab("Prezzo in euro") + ylab("Densità") + ggtitle("Densità dei prezzi in base al giorno") + labs(caption="Figura 3: Densità condizionata per giorno della variabile Prezzo")  + theme(plot.caption=element_markdown(hjust=0))
+
+```
+
+Infine prima di concludere l'analisi esplorativa dei dati, è utile anche analizzare il rapporto tra le varie variabili esplicative indipendenti presenti nel dataset.
+
+Ad esempio prendiamo in considerazione le variabili categoriali Guest Satisfaction e Cleanliness Rating e vediamo come varia il Guest Satisfaction a seconda dei livello che la variabile categoriale Cleanliness Rating assume. 
+
+Dal grafico notiamo come Cleanliness Rating impatti sul Guest Satisfaction. Il Guest Satisfaction è maggiore per quegli airbnb le cui stanze sono pulite ed ordinate.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+ggplot(airbnb_Rome_mescolato, aes(x = `Guest Satisfaction`, y = `Cleanliness Rating`)) + 
+  geom_boxplot() + coord_flip() + xlab("Guest Satisfaction")+
+  ylab("Cleanliness Rating") +
+  ggtitle("Guest Satisfaction versus Cleanliness Rating") +
+  coord_flip() +
+  theme_bw() + labs(caption="Figura 4: Boxplot per Guest Satisfaction dato il Cleanliness Rating")  + theme(plot.caption=element_markdown(hjust=0))
+```
+
+
+</div>
+
+<div id="POSITIVE" class="section level1">
+
+# Positive continuous data
+
+
+```{r,include=FALSE, warning=FALSE, message=FALSE}
+airbnb_Rome_mescolato <- subset(airbnb_Rome_mescolato, select = -c(`Restraunt Index`))
+```
+
+
+
+Come abbiamo visto in precedenza, la distribuzione dei prezzi presenta alcune caratteristiche:
+
+* Distribuzione continua non negativa.
+
+* L'asimmetria è verso destra.
+
+La distribuzione è asimmetrica positiva, la densità dei dati è maggiore a sinistra del valore mediano del prezzo, viceversa la densità dei dati a destra del valore mediano del prezzo è minore.
+
+
+Prendendo in considerazione queste caratteristiche, prenderemo in considerazioni le sguenti distribuzioni:
+
+* Distribuzione Gamma
+
+* Distribuzione Guassiana Inversa
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+ggplot(airbnb_Rome_mescolato, aes(x = Price)) +
+  geom_density(alpha = 0.5) +
+  theme_bw() + xlab("Prezzo in euro") + ylab("Densità") + ggtitle("Densità dei prezzi") + geom_vline(xintercept = quantile(airbnb_Rome_mescolato$Price, 0.50), col = "red", lty=2, size=1) + geom_text(x=550, y=0.0049,
+                                                                                                                label = paste("Mediana:\t",round(quantile(airbnb_Rome_mescolato$Price, 0.50),1),"€"), color="red") + labs(caption="Figura 5: Densità della variabile Prezzo")  + theme(plot.caption=element_markdown(hjust=0))
+```
+
+Innanzitutto dividiamo il dataset in training set e test set. Il training set è composto dall'80% delle osservazioni totali e verrà utilizzato per addestrare i vari modelli, Gamma regression e Inverse Gaussian regression, mentre il restante 20% farà parte del test set e verrà utilizzato per vedere quanto bene/male il modello in esame prevede la variabile dipendente prezzo.
+
+La Gamma regression è un GLM (General linear model) in cui la componente casuale segue una distribuzione Gamma.
+
+Per una più chiara interpretazione dei parametri del modello, verrà utilizzato il log-link.
+
+L'obiettivo è quello di scegliere uno o più modelli contenenti solo quelle variabili esplicative che hanno un impatto statisticamente significativo sulla variabile dipendente prezzo.
+
+Le performance predittive del modello verranno valutate grazie ai dati unseen del test set. 
+
+```{r,include=FALSE, warning=FALSE, message=FALSE}
+
+set.seed(300399)
+
+indice_train_airbnb_Rome_mescolato <- sample(1:nrow(airbnb_Rome_mescolato), 0.80 * nrow(airbnb_Rome_mescolato))
+
+train_set_airbnb_Rome_mescolato <- airbnb_Rome_mescolato[indice_train_airbnb_Rome_mescolato, ]
+
+# Rimuovere i numeri di osservazione
+row.names(train_set_airbnb_Rome_mescolato) <- NULL
+
+test_set_airbnb_Rome_mescolato <- airbnb_Rome_mescolato[-indice_train_airbnb_Rome_mescolato, ]
+
+row.names(test_set_airbnb_Rome_mescolato) <- NULL
+
+# dim(train_set) ## 7221x14
+
+# dim(test_set)  ## 1806x14
+
+```
+
+
+</div>
+
+<div id="GAMMA" class="section level1">
+
+# Gamma regression
+
+
+## Model selection
+
+Consideriamo come primo modello, un modello completo contenente tutte le variabili esplicative indipendenti.
+
+Come possiamo notare dal summary, in particolare dai p-value, non tutte le variabili esplicative sono statisticamente significative, non tutte hanno un impatto significativo sul prezzo.
+
+Nel summary vengono riportate la  Null deviance e la Residual Deviance.
+
+La Null Deviance è data dalla differenza tra la log-likelihood del modello saturo e la log-likelihood del modello nullo. Se questa differenza è piccola, allora il modello da preferire per il principio di Parsimonia è quello nullo, ovvero il modello con solo l'intercetta $\beta_0$.
+
+La Residual Deviance invece è data dalla differenza tra la log-likelihood del modello saturo e la log-likelihood del modello stimato.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+glm.gamma.fit <- glm(Price ~ ., data = train_set_airbnb_Rome_mescolato,
+family=Gamma(link=log))
+
+summary(glm.gamma.fit)
+```
+
+
+Stimiamo un modello ridotto in cui escludiamo la variabile esplicativa che presenta il p-value maggiore, ovvero  Business.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+glm.gamma.fit.ridotto1 <- glm(Price ~ ., data = subset(train_set_airbnb_Rome_mescolato, select = -c(Business)),
+family=Gamma(link=log))
+```
+
+Possiamo confrontare il modello completo con il modello ridotto grazie al test LRT (Likelihood-Ratio-Test) in quanto si tratta di modelli NESTED.
+
+Il p-value (0.5827) è maggiore del livello di significatività $\alpha$ fissato al 5%, quindi non possiamo rigettare l’ipotesi Nulla H0.
+
+I due modelli sono equivalenti. Per il principio di parsimonia scegliamo il modello ristretto.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+anova(glm.gamma.fit.ridotto1, glm.gamma.fit, test = "LRT")
+```
+
+Eseguiamo il test LRT (Likelihood-Ratio-Test) prendendo in considerazione il modello ridotto stimato in precedenza.
+
+
+Aggiungendo una alla volta le varie variabili esplicative, notiamo come la devianza si riduca di molto quando all'interno del modello aggiungiamo una variabile che ha un impatto significativo sul prezzo, viceversa quando aggiungiamo all'interno del modello una variabile che non ha un impatto significativo sul prezzo, come ad esempio Superhost e Multiple Rooms, la devianza si riduce di poco.
+
+Le variabili esplicative Superhost e Multiple Rooms non hanno un impatto significativo sul prezzo.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+anova(glm.gamma.fit.ridotto1, test = "LRT")
+```
+
+
+Prendendo in considerazione il modello stimato in precedenza, andiamo a stimare un'ulteriore modello in cui la variabile esplicativa Superhost è esclusa. 
+
+Dando uno sguardo ai p-value possiamo notare come tutte le variabili esplicative siano statisticamente significative ad eccezzione di Multiple Rooms.
+
+La variabile esplicativa Multiple Rooms riduce di poco la devianza.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+glm.gamma.fit.ridotto2 <- glm(Price ~ ., data = subset(train_set_airbnb_Rome_mescolato, select = -c(Business,Superhost)),
+family=Gamma(link=log))
+```
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+anova(glm.gamma.fit.ridotto2, test = "LRT")
+```
+
+Stimiamo un'ulteriore modello in cui la variabile esplicativa Multiple Rooms è esclusa.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+glm.gamma.fit.ridotto3 <- glm(Price ~ ., data = subset(train_set_airbnb_Rome_mescolato, select = -c(Business,Superhost,`Multiple Rooms` )),
+family=Gamma(link=log))
+```
+
+
+Analizzando la devianza grazie al test LRT, notiamo come essa si riduce quando aggiungiamo una variabile esplicativa alla volta.
+
+Tutte le variabili esplicative sono statisticamente significative.
+
+Cleanliness Rating è significativa al 1%.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+anova(glm.gamma.fit.ridotto3, test = "LRT")
+```
+
+In definitiva, grazie al test LRT confrontiamo il modello completo stimato all'inizio con il modello ridotto in cui le variabili esplicative Business,Superhost e Multiple Rooms  sono state escluse.
+
+Il p-value (0.6105) è maggiore del livello di significatività $\alpha$ fissato al 5%, quindi non possiamo rigettare l’ipotesi Nulla H0.
+
+I due modelli sono equivalenti. Per il principio di parsimonia scegliamo il modello ristretto.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+anova(glm.gamma.fit.ridotto3, glm.gamma.fit, test = "LRT")
+```
+
+</div>
+
+<div id="INTERPRETAZIONE" class="section level1">
+
+# Interpretazione dei coefficienti
+
+Prendiamo in considerazione due variabili esplicative, una numerica continua e una di tipo categoriale.
+
+**Metro Distance (km) = 3.1**
+
+* Questa variabile esplicativa rappresenta la distanza (misurata in km) degli airbnb dalla metropolitana. Ceteris paribus, in media il prezzo degli airbnb aumenta del 3.1% quando la variabile esplicativa Metro Distance (km) subisce un incremento unitario.
+
+**DayWeekend = 3.5**
+
+* Questa variabile esplicativa rappresenta la prenotazione di un airbnb nel Weekend. 
+Ceteris paribus, in media il prezzo degli airbnb durante il Weekend aumenta del 3.5% rispetto agli altri giorni della settimana.
+
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+
+coefficienti <- (exp(coef(glm.gamma.fit.ridotto3))-1)*100
+
+coefficients_df <- data.frame(coefficienti = coefficienti[-1], variable = names(coefficienti[-1]))
+
+# Aggiungi una colonna per indicare il segno del coefficiente
+
+coefficients_df$Segno <- ifelse(coefficients_df$coefficienti >= 0, "Positivo", "Negativo")
+
+# Barplot con ggplot2
+ggplot(coefficients_df, aes(x = reorder(variable, coefficienti), y = coefficienti, fill = Segno)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_fill_manual(values = c("Positivo" = "skyblue", "Negativo" = "salmon")) +
+  labs(title = "Impatto percentuale medio delle variabili sul prezzo") +
+  xlab("Variabile")  + ylab("Impatto percentuale")+ theme_bw() + coord_flip() + labs(caption="Figura 6: Diagramma a barre dell'impatto percentuale medio delle variabili sul prezzo")  + theme(plot.caption=element_markdown(hjust=0)) 
+
+```
+
+
+</div>
+
+
+<div id="VALIDAZIONE" class="section level1">
+
+# Validazione
+
+Ora, considerando il modello scelto addestrato sui dati di training, andiamo a prevedere il prezzo degli airbnb utilizzando il test set. Le metriche di performance prese in considerazione sono il Mean Squared Error, il Root Mean Squared Error e il Mean Absolute Error.
+
+Queste metriche di performance verranno confrontate successivamente con le metriche di performance dell'altro modello scelto, in cui andremo a considerare la distribuzione Gaussiuana Inversa.
+
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+library(kableExtra)
+pred_gamma <- predict(glm.gamma.fit.ridotto3, newdata = test_set_airbnb_Rome_mescolato, type = "response")
+
+# Calcolo delle metriche di performance
+
+# Errore quadratico medio (Mean Squared Error - MSE)
+
+mse <- mean((test_set_airbnb_Rome_mescolato$Price - pred_gamma)^2)
+
+# Radice dell'errore quadratico medio (Root Mean Squared Error - RMSE)
+rmse <- sqrt(mse)
+
+# Errore assoluto medio (Mean Absolute Error - MAE)
+mae <- mean(abs(test_set_airbnb_Rome_mescolato$Price - pred_gamma))
+
+metriche_performance_gamma <- data.frame("Mean Squared Error" = mse, "Root Mean Squared Error" = rmse, "Mean Absolute Error" = mae)
+
+performance_gamma <- data.frame(
+  Metrica = c("Mean Squared Error", "Root Mean Squared Error", "Mean Absolute Error"),
+  Gamma = c(mse, rmse, mae))
+
+kable(performance_gamma, format = "html", escape = FALSE,caption = "<center>Tabella1: Metriche di performance per la regressione Gamma </center>") %>%
+  kable_styling(bootstrap_options = "striped", full_width = FALSE)
+
+```
+
+</div>
+
+
+<div id="INVERSE" class="section level1">
+
+# Inverse Gaussian regression
+
+La Inverse Gaussian regression è un GLM (General linear model) in cui la componente casuale segue una distribuzione Gaussiana Inversa.
+
+Per una più chiara interpretazione dei parametri del modello, verrà utilizzato il log-link.
+
+## Model Selection
+
+Consideriamo come primo modello, un modello completo contenente tutte le variabili esplicative indipendenti.
+
+Come possiamo notare dal summary, in particolare dai p-value, non tutte le variabili esplicative sono statisticamente significative, non tutte hanno un impatto significativo sul prezzo.
+
+In particolare, le variabili esplicative Superhost, Multiple Rooms e Business non sono statisticamente significative.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+glm.gaussiana_inversa.fit <- glm(Price ~ ., data = train_set_airbnb_Rome_mescolato,
+family=inverse.gaussian(link = "log"))
+
+summary(glm.gaussiana_inversa.fit)
+```
+
+
+Stimiamo un modello ridotto in cui escludiamo la variabile esplicativa che presenta il p-value maggiore, ovvero Multiple Rooms.
+
+Possiamo confrontare il modello completo stimato in precedenza con il modello ridotto grazie al test LRT (Likelihood-Ratio-Test) in quanto si tratta di modelli NESTED.
+
+Il p-value (0.5644) è maggiore del livello di significatività $\alpha$ fissato al 5%, quindi non possiamo rigettare l’ipotesi Nulla H0.
+
+I due modelli sono equivalenti. Per il principio di parsimonia scegliamo il modello ristretto.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+glm.gaussiana_inversa.ridotto1 <- glm(Price ~ ., data = subset(train_set_airbnb_Rome_mescolato, select = -c(`Multiple Rooms`)),
+family=inverse.gaussian(link = "log"))
+
+```
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+anova(glm.gaussiana_inversa.ridotto1, glm.gaussiana_inversa.fit, test = "LRT")
+```
+
+Eseguiamo il test LRT (Likelihood-Ratio-Test) prendendo in considerazione il modello ridotto stimato in precedenza.
+
+
+Le variabili esplicative Superhost e Cleanliness Rating non hanno un impatto significativo sul prezzo.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+anova(glm.gaussiana_inversa.ridotto1, test = "LRT")
+```
+
+
+Prendendo in considerazione il modello stimato in precedenza, andiamo a stimare un'ulteriore modello in cui la variabile esplicativa Superhost è esclusa. 
+
+Con il test LRT confrontiamo il modello completo con il modello ridotto in cui le variabili esplicative Multiple Rooms e Superhost  sono state escluse.
+
+Il p-value (0.337) è maggiore del livello di significatività $\alpha$ fissato al 5%, quindi non rigettiamo l'ipotesi nulla H0. I due modelli sono equivalenti.
+
+Per il principio di parsimonia scegliamo il modello ristretto.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+glm.gaussiana_inversa.ridotto2 <- glm(Price ~ ., data = subset(train_set_airbnb_Rome_mescolato, select = -c(Superhost, `Multiple Rooms`)),
+family=inverse.gaussian(link = "log"))
+```
+
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+anova(glm.gaussiana_inversa.fit,glm.gaussiana_inversa.ridotto2, test = "LRT")
+```
+
+Eseguiamo il test LRT (Likelihood-Ratio-Test) prendendo in considerazione il modello ridotto stimato in precedenza.
+
+In questo caso dando uno sguardo ai p-value notiamo che tutte le variabili esplicative sono statisticamente significative ad eccezzione di Cleanliness Rating.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+anova(glm.gaussiana_inversa.ridotto2, test = "LRT")
+```
+
+Infine, prendendo in considerazione il modello stimato in precedenza, andiamo a stimare un'ulteriore modello in cui la variabile esplicativa Cleanliness Rating è esclusa. 
+
+Tutte le variabili esplicative sono statisticamente significative.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+glm.gaussiana_inversa.ridotto3 <- glm(Price ~ ., data = subset(train_set_airbnb_Rome_mescolato, select = -c(Superhost, `Multiple Rooms`,`Cleanliness Rating`)),
+family=inverse.gaussian(link = "log"))
+summary(glm.gaussiana_inversa.ridotto3)
+```
+
+
+</div>
+
+
+<div id="INTERPRETAZIONE_INVERSE" class="section level1">
+
+
+# Interpretazione dei coefficienti
+
+Prendiamo in considerazione due variabili esplicative, una numerica continua e una di tipo categoriale.
+
+**Metro Distance (km) = 3.09**
+
+*  Ceteris paribus, in media il prezzo degli airbnb aumenta del 3% quando la variabile esplicativa Metro Distance (km) subisce un incremento unitario. In precedenza tale variazione in media ammontava al 3.1%.
+
+
+**DayWeekend = 3.64**
+
+*  Ceteris paribus, in media il prezzo degli airbnb durante il Weekend aumenta del 3.64% rispetto agli altri giorni della settimana. In precedenza tale variazione in media ammontava al 3.5%.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+coefficienti <- (exp(coef(glm.gaussiana_inversa.ridotto3))-1)*100
+
+
+coefficients_df <- data.frame(coefficienti = coefficienti[-1], variable = names(coefficienti[-1]))
+
+# Aggiungi una colonna per indicare il segno del coefficiente
+
+coefficients_df$Segno <- ifelse(coefficients_df$coefficienti >= 0, "Positivo", "Negativo")
+
+# Barplot con ggplot2
+ggplot(coefficients_df, aes(x = reorder(variable, coefficienti), y = coefficienti, fill = Segno)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_fill_manual(values = c("Positivo" = "skyblue", "Negativo" = "salmon")) +
+  labs(title = "Impatto percentuale medio delle variabili sul prezzo") +
+  xlab("Variabile")  + ylab("Impatto percentuale")+ theme_bw() + coord_flip() + labs(caption="Figura 7: Diagramma a barre dell'impatto percentuale medio delle variabili sul prezzo")  + theme(plot.caption=element_markdown(hjust=0)) 
+
+
+
+```
+
+</div>
+
+
+<div id="VALIDAZIONE_INVERSE" class="section level1">
+
+# Validazione
+
+Considerando il modello scelto addestrato sui dati di training, andiamo a prevedere il prezzo degli airbnb utilizzando il test set.
+
+Qui confronteremo le metriche di performance dei due modelli scelti. 
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+pred_gaussiana_inversa <- predict(glm.gaussiana_inversa.ridotto3, newdata = test_set_airbnb_Rome_mescolato, type = "response")
+
+# Calcolo delle metriche di performance
+
+# Errore quadratico medio (Mean Squared Error - MSE)
+
+mse_gaussiana_inversa <- mean((test_set_airbnb_Rome_mescolato$Price - pred_gaussiana_inversa)^2)
+
+# Radice dell'errore quadratico medio (Root Mean Squared Error - RMSE)
+rmse_gaussiana_inversa <- sqrt(mse_gaussiana_inversa)
+
+# Errore assoluto medio (Mean Absolute Error - MAE)
+mae_gaussiana_inversa <- mean(abs(test_set_airbnb_Rome_mescolato$Price - pred_gaussiana_inversa))
+
+
+test_set_airbnb_Rome_mescolato$Gamma <- pred_gamma
+
+test_set_airbnb_Rome_mescolato$Gaussiana_Inversa <- pred_gaussiana_inversa
+```
+
+
+Dal grafico notiamo che le previsioni dei due modelli considerati sono molto simili tra loro.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+ggplot(test_set_airbnb_Rome_mescolato, aes(Price, Gamma, colour="Gamma")) +
+  geom_point() + theme_bw()  +  xlab("Prezzo") + ylab("Previsione") + ggtitle("Previsione vs Prezzo") +
+  geom_point(x=test_set_airbnb_Rome_mescolato$Price,y=test_set_airbnb_Rome_mescolato$Gaussiana_Inversa, aes(colour='Gaussiana Inversa')) +
+  scale_color_manual(
+    name='Modello',
+    values=c('black','red')) + geom_abline(col="grey")  + labs(caption="Figura 8: Confronto delle previsioni dei due modelli")  + theme(plot.caption=element_markdown(hjust=0))
+```
+
+
+Come possiamo notare dalla tabella, la Gamma regression presenta delle metriche di performance un pò più accurate.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+library(kableExtra)
+performance <- data.frame(
+  Metrica = c("Mean Squared Error", "Root Mean Squared Error", "Mean Absolute Error"),
+  Gamma = c(mse, rmse, mae),
+  Gaussiana_Inversa = c(mse_gaussiana_inversa, rmse_gaussiana_inversa, mae_gaussiana_inversa)
+)
+
+kable(performance, format = "html", escape = FALSE,caption = "<center>Tabella2: Metriche di performance per la regressione Gamma e Inversa Gaussiana </center>") %>%
+  kable_styling(bootstrap_options = "striped", full_width = FALSE)
+```
+
+
+
+</div>
+
+
+
+<div id="MARGINAL" class="section level1">
+
+# Marginal effects
+
+Utilizziamo il modello stimato con la Gamma regression per calcolare gli effetti marginali.
+
+Consideriamo alcune variabili categoriali che possono influenzare il prezzo di un airbnb, ad esempio il numero di camere da letto.
+
+Più camere da letto ci sono, maggiore è il prezzo previsto.
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+library(ggeffects)
+mf1 <- ggpredict(glm.gamma.fit.ridotto3,term=c("Bedrooms[all]"))
+plot(mf1) + labs(caption="Figura 9: Previsione dei prezzi considerando la variabile Bedrooms")  + theme(plot.caption=element_markdown(hjust=0))
+```
+
+Consideriamo ora le variabili categoriali Room Type e Day.
+
+Ovviamente il prezzo previsto sarà maggiore per "entire home", ovvero quando l'ospite avrà l'accesso esclusivo e privato a tutta la casa o all'appartamento durante il soggiorno. 
+
+I prezzi previsti risultano un pò più alti quando prenotiamo un airbnb durante il weekend.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+mf2 <- ggpredict(glm.gamma.fit.ridotto3,term=c("Room Type[all]", "Day[all]"))
+plot(mf2) + labs(caption="Figura 10: Previsione dei prezzi considerando le variabili Room Type e Day")  + theme(plot.caption=element_markdown(hjust=0))
+```
+
+</div>
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+#save.image("ambiente_lavoro_AirbnbRome.RData")
+# write.csv(train_set_airbnb_Rome_mescolato,"train_set_airbnb_Rome_mescolato.csv")
+# write.csv(test_set_airbnb_Rome_mescolato, "test_set_airbnb_Rome_mescolato.csv")
+```
+
+
+
+
+
+
+
+
+
+

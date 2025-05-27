@@ -1,0 +1,962 @@
+---
+title: "Advanced Statistical Modeling For Big Data - BankMarketing dataset"
+author: "Massimiliano Pastorino"
+output: html_document
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<html>
+<head>
+<style>
+body {
+  background-color: 	silver;
+  text-align: justify;
+}
+</style>
+</head>
+</html>
+
+<h1 class="title toc-ignore">Indice</h1>
+
+<div id="TOC">
+<li><a href="#Introduzione">Introduzione</a></li>
+
+<li><a href="#EDA">Analisi esplorativa dei dati (EDA)</a></li>
+
+<li><a href="#CATEGORICAL">Positive continuous data</a></li>
+
+<ul>
+
+<li><a href="#LOGISTIC">Logistic Regression</a></li>
+
+<li><a href="#INTERPRETAZIONE">Interpretazione dei coefficienti</a></li>
+
+<li><a href="#VALIDAZIONE">Validazione - Confronto hold out CV con ten-fold CV</a></li>
+
+<li><a href="#MARGINAL">Marginal effects</a></li>
+
+</ul>
+
+<li><a href="#CLASSISBILANCIATE">Problema delle classi sbilanciate</a></li>
+<ul>
+<li><a href="#CLOGLOG">Modello cloglog e curva ROC</a></li>
+
+<li><a href="#LOGISTICAPESATA">Regressione Logistica Pesata</a></li>
+
+</ul>
+
+<li><a href="#ELASTICNET">Regressione Logistica Penalizzata</a></li>
+<li><a href="#RIEPILOGO">Riepilogo finale</a></li>
+</div>
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+bank_full <- read.csv("C:/Users/massi/OneDrive/Desktop/Unisa/Magistrale/2° Anno/1°  Semestre/Advanced Statistical Modeling For Big Data//Progetti/bank-full.csv")
+```
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+# str(bank_full)
+```
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+library(ggplot2)
+library(tidyverse)
+
+bank_full$Age_range <- cut(bank_full$age, breaks=c(18,39,59,75,90),include.lowest = TRUE,labels=c("Prima Fascia(18-39)", "Seconda Fascia(40-59)", "Terza Fascia(60-75)","Quarta Fascia(76-90)"))
+
+bank_full <- bank_full%>%
+  mutate(
+    "Job Sector" = case_when(
+      job == "unemployed" ~ "unemployed",
+      job == "student" ~ "student",
+      job == "retired" ~ "retired",
+      job == "admin." | job == "management" ~ "administration_management",
+      job == "blue-collar" | job == "technician"   ~ "blue_collar",
+      job == "services" | job == "housemaid" ~ "services",
+      job == "self-employed" | job == "entrepreneur"  ~ "self_employed",
+      job == "unknown" ~ "unknown",
+    ),
+    "Marital Status" = case_when(
+     marital == "single" | marital == "divorced" ~ "no_married",
+     marital == "married" ~ "married"
+    ))
+
+bank_full$job <- NULL
+
+bank_full$marital <- NULL
+
+bank_full$`Job Sector`<- factor(bank_full$`Job Sector`)
+bank_full$`Marital Status` <- factor(bank_full$`Marital Status`)
+
+bank_full$`Term Deposit` <- as.factor(ifelse(bank_full$y == "no","No_TermDeposit","TermDeposit"))
+
+bank_full$y <- NULL
+
+bank_full$default <- as.factor(ifelse(bank_full$default == "no","no_defaulter","defaulter"))
+bank_full$housing <- as.factor(ifelse(bank_full$housing == "no", "no_housing_loan"," housing_loan"))
+bank_full$loan    <- as.factor(ifelse(bank_full$loan == "no", "no_personal_loan", "personal_loan"))
+bank_full$education <- factor(bank_full$education)
+bank_full$contact <- factor(bank_full$contact)
+bank_full$poutcome <- factor(bank_full$poutcome)
+
+```
+
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+bank_full$month <- NULL
+#str(bank_full)
+```
+
+```{r,include=FALSE, warning=FALSE, message=FALSE}
+table(is.na(bank_full)) # Si sono 7 
+
+bank_full <- na.omit(bank_full)
+```
+
+
+```{r,include=FALSE, warning=FALSE, message=FALSE}
+table(duplicated(bank_full)) ## Si sono 3
+
+bank_full <- unique(bank_full)
+```
+
+
+<div id="Introduzione" class="section level1">
+
+# Introduzione
+
+Il data set in esame rappresenta il risultato di una campagna marketing effettuata da un
+istituto bancario portoghese e riporta il dettaglio degli utenti che hanno sottoscritto o meno
+un deposito a termine. 
+
+Il dataset è reperibile al seguente link: https://archive.ics.uci.edu/ml/datasets/bank+marketing
+
+Nella prima parte del caso studio verranno analizzate alcune delle variabili presenti nel dataset, attraverso l’analisi e la visualizzazione dei dati (EDA) capiremo come la variabile dipendente Term Deposit è influenzata dalle principali variabili indipendenti presenti nel dataset di riferimento.
+
+Nella seconda parte del caso studio verranno stimati dei modelli glm considerando le opprtune distribuzioni appartenenti alla famiglia esponenziale che meglio si adattano alla risoluzione del nostro problema.
+
+In questo caso, l’obiettivo cardine sarà quello d’implementare il miglior modello di classificazione, ovvero quel modello che riesca a classificare con un certo grado di accuratezza
+coloro che hanno sottoscritto un deposito a termine, in modo tale da ridurre al minimo i
+possibili errori, e in modo particolare di ridurre al minimo il numero di falsi negativi, ovvero
+coloro che effettivamente non hanno sottoscritto il deposito a termine proposto dall’istituto
+finanziario.
+
+I modelli verranno validati considerando dei dati unseen, inoltre le varie metriche di performance prese in considerazione ci diranno quale modello si adatta meglio all’obbiettivo del caso studio.
+
+</div>
+
+# Analisi esplorativa dei dati  (EDA)
+
+<div id="EDA" class="section level1">
+
+La variabile dipendente Term Deposit è di tipo categoriale, grazie ad un diagramma a barre possiamo analizzare la percentuale di osservazioni che hanno sottoscritto un deposito a termine.
+
+Dal diagramma a barre notiamo come le classi siano sbilanciate, in particolare più del 75% delle osservazioni non ha sottoscritto un deposito a termine. 
+
+Dato che l'obiettivo è quello di costruire un classificatore in grado di classificare correttamente chi ha sottoscritto un deposito a termine, bisognerà tenere conto di questo sbilanciamento.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+library(ggplot2)
+library(ggtext)
+ggplot(bank_full, aes(x = `Term Deposit`, y = ..count../sum(..count..))) + geom_bar(width = 0.5) + theme_bw() + ylab("Frequenza Relativa") + ggtitle("Frequenza relativa per Term Deposit") +  labs(caption="Figura 1: Diagramma a barre delle frequenze relative per Term Deposit")  + theme(plot.caption=element_markdown(hjust=0))
+```
+
+Dato che nel dataset in esame sono presenti alcune variabili numeriche, è utile individuare eventuali legami lineari e quindi osservare la correlazione per capire quanto è intenso tale legame lineare se presente.
+
+Come possiamo vedere dal grafico, la maggioranza delle variabili numeriche presenta una correlazione bassa.
+
+L'intensità del legame lineare tra previous e pdays è moderata.
+
+Previous rapppresenta il numero di contatti avuti con il cliente prima dell’attuale campagna marketing mentre pdays rappresenta il numero di giorni trascorsi da quando il cliente era stato contattato per una precedente campagna marketing.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+library(dplyr)
+GGally::ggpairs(bank_full%>% dplyr::select(balance, day,`duration`, campaign  ,  pdays , previous)) + labs(caption="Figura 2: Grafico delle correlazioni delle variabili numeriche")  + theme(plot.caption=element_markdown(hjust=0))
+```
+
+
+Durante l'analisi esplorativa, è utile selezionare alcune delle variabili presenti nel dataset per vedere come esse incidono sulla sottoscrizione o meno del deposito a termine.
+
+Ad esempio prendiamo in considerazione la variabile age e vediamo come essa incide sulla variabile dipendente.
+
+Come si può facilmente notare, persone di tutte le età possono sottoscrivere un deposito a termine. Tuttavia gli utenti appartenenti alla fascia d’età trenta-quaranta ne usufruiscono maggiormente.
+
+La stessa fascia d’età però presenta il conteggio più alto anche tra coloro che non hanno
+sottoscritto un deposito, ma questo è ragionevole in quanto le persone presenti in questa fascia d’età sono anche le più contattate.
+
+
+Dall’istogramma è chiara la distribuzione asimmetrica dell’età degli utenti. In questo caso si nota un’asimmetria positiva con una lunga coda a
+destra. La  banca si è rivolta principalmente a un’utenza giovane/medio-giovane.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+ggplot(bank_full, aes(x=age, fill = `Term Deposit`)) + geom_histogram(bins=30)  + theme_bw() + ylab("Frequenza assoluta") + ggtitle("Age vs Term Deposit")  + xlab("Età") + labs(caption="Figura 3: Istogramma della distribuzione dell’età degli utenti in relazione alla variabile target")  + theme(plot.caption=element_markdown(hjust=0))
+```
+
+Una variabile categoriale molto importante è housing, essa indica l’eventuale presenza di un mutuo.
+
+Confrontiamo i clienti mutuatari con i clienti non mutuatari in relazione
+alla variabile target per analizzare quanto il fattore mutuo incide sulle sottoscrizioni di depositi.
+
+Dal diagramma a barre è chiaro come la maggioranza degli utenti contattati dalla banca abbia
+un mutuo, inoltre notiamo anche il conteggio maggiore di sottoscrizioni di depositi
+per coloro che non lo presentano.
+
+Alla luce dei risultati ottenuti è probabile che il mutuo influenzi la propensione/inclinazione di una persona ad investire in un deposito a termine.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+ggplot(bank_full, aes(x=housing, y =..count.., fill = `Term Deposit`)) + geom_bar(position = "dodge") + theme_bw() + ylab("Frequenza assoluta") + xlab("Mutuatario/Non Mutuatario") + ggtitle("Housing vs Term Deposit") + labs(caption="Figura 4: Diagramma a barre della frequenza relativa dei mutui/non mutui in relazione alla variabile target")  + theme(plot.caption=element_markdown(hjust=0))
+```
+
+
+Infine prima di concludere l’analisi esplorativa dei dati, è utile anche analizzare il rapporto tra le varie variabili esplicative indipendenti presenti nel dataset.
+
+Ad esempio prendiamo in considerazione le variabili categoriali job sector ed education e la variabile numerica balance.
+
+Dal diagramma a barre notiamo come il livello di educazione influenzi il saldo. Chi
+presenta il livello di educazione più alto ha un saldo medio maggiore e questo vale per tutti e quattro i settori lavorativi. Inoltre per tutti e tre i livelli di educazione notiamo che i
+lavoratori autonomi (Self Employed) e i lavoratori del settore Administration Management
+(amministrazione e gestione) presentano un saldo medio maggiore.
+
+
+In basso viene riportato il livello mediano del saldo. La mediana è una misura robusta
+poco influenzata dalla presenza di dati anomali, in questo caso saldi molto elevati. 
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+balance_job_education <- bank_full%>%
+  select(balance,education,`Job Sector`)%>%
+ filter(education %in% c("primary","secondary","tertiary") & `Job Sector` %in% c("administration_management","blue_collar","self_employed","services"))%>%
+  group_by(`Job Sector`,education)%>%
+  summarise("Valore Medio" = mean(balance), "Valore Mediano" = median(balance))
+
+  
+valore_medio <- ggplot(balance_job_education,aes(x=education,y= 
+balance_job_education$`Valore Medio`, fill = `Job Sector`)) +
+geom_col(position = "dodge") + ylab("") + xlab("Livello di educazione") + ylab("Saldo Medio in euro") + ggtitle("Saldo medio e mediano per i diversi tipi di lavoro in base ai livelli di educazione") + theme_bw()
+
+
+valore_mediano <- ggplot(balance_job_education,aes(x=education,y= 
+balance_job_education$`Valore Mediano`, fill = `Job Sector`)) +
+geom_col(position = "dodge") + ylab("Saldo Mediano in euro") + xlab("Livello di educazione") + theme_bw() + labs(caption="Figura 5:  Diagrammi a barre relativi al saldo medio e mediano per i tipi di lavoro in
+base ai livelli di educazione")  + theme(plot.caption=element_markdown(hjust=0))
+
+gridExtra:: grid.arrange(valore_medio, valore_mediano) 
+
+```
+
+
+</div>
+
+<div id="CATEGORICAL" class="section level1">
+
+# Categorical data
+
+Dato che la variabile dipendente è una variabile categoriale, prenderemo in considerazione i modelli glm per dati categoriali.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+library(ggplot2)
+ggplot(bank_full, aes(x = `Term Deposit`, y = ..count../sum(..count..))) + geom_bar(width = 0.5) + theme_bw() + ylab("Frequenza Relativa") + ggtitle("Frequenza relativa per Term Deposit") + labs(caption="Figura 6: Diagramma a barre delle frequenze relative per Term Deposit")  + theme(plot.caption=element_markdown(hjust=0))
+```
+
+
+Innanzitutto dividiamo il dataset in training set e test set. Il training set è composto dall’75% delle osservazioni totali e verrà utilizzato per addestrare i vari modelli, mentre il restante 25% farà parte del test set e verrà utilizzato per vedere quanto bene/male il modello in esame prevede la variabile dipendente Term Deposit.
+
+</div>
+
+<div id="LOGISTIC" class="section level1">
+
+# Logistic Regression
+
+La logistic regression è un GLM (General linear model) in cui la componente casuale segue una distribuzione di Bernoulli o Binomiale. La link function è la funzione logit.
+
+L’obiettivo è quello di scegliere uno o più modelli contenenti solo quelle variabili esplicative che hanno un impatto statisticamente significativo sulla variabile dipendente Term Deposit.
+
+Le performance predittive del modello verranno valutate grazie ai dati unseen del test set.
+
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+library(caret)
+
+bank_full <- bank_full%>%
+  filter(`Job Sector` %in% c("administration_management","blue_collar","services","self_employed","student"))
+
+
+bank_full <- bank_full%>%
+  filter(Age_range %in% c("Prima Fascia(18-39)","Seconda Fascia(40-59)"))
+
+
+
+## Standardizzo le variabili numeriche in quanto hanno una scala troppo diversa (vedi summary numeriche)
+
+# Seleziona solo le variabili numeriche
+
+variabili_numeriche <- bank_full[, sapply(bank_full, is.numeric)]
+
+# Standardizza le variabili numeriche
+
+variabili_standardizzate <- scale(variabili_numeriche)
+
+
+bank_full <- cbind(variabili_standardizzate, bank_full[, -which(names(bank_full) %in% names(variabili_numeriche))])
+
+
+# Definisci la formula del modello logistico
+colnames(bank_full) <- make.names(colnames(bank_full))
+
+bank_full$age <- NULL
+
+# Creare un oggetto "data" per caret
+
+set.seed(300399)
+
+data_caret <- createDataPartition(bank_full$Term.Deposit, times = 1, p = 0.75, list = TRUE)
+
+idx_train <- data_caret$Resample1
+
+train_set <- bank_full[idx_train,]
+
+test_set <- bank_full[-idx_train,]
+
+# dim(train_set)
+
+# dim(test_set)
+
+# write.csv(train_set, file = "Train.csv")
+
+# write.csv(test_set, file = "Test.csv")
+
+# Ho salvato i dataset di train e test set dopo aver fatto il seed cosi uso quelli sempre
+
+# pero quando importo devo di nuovo riformattare
+
+```
+
+
+
+Consideriamo come primo modello, un modello completo contenente tutte le variabili esplicative indipendenti.
+
+Come possiamo notare dal summary, in particolare dai p-value, non tutte le variabili esplicative sono statisticamente significative.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+glm.logit.fit <- glm(Term.Deposit ~ ., data = as.data.frame(train_set),
+family=binomial(link="logit"))
+
+summary(glm.logit.fit)
+```
+
+Eseguiamo il test LRT (Likelihood-Ratio-Test) prendendo in considerazione il modello stimato in precedenza.
+
+Notiamo che la variabile esplicativa default riduce di poco la devianza.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+anova(glm.logit.fit, test="LRT")
+```
+
+Stimiamo un modello ridotto in cui escludiamo la variabile esplicativa default e confrontiamo il modello completo con il modello ridotto grazie al test LRT per modelli NESTED.
+
+Il p-value (0.1604) è maggiore del livello di significatività $\alpha$
+fissato al 5%, quindi non rigettiamo l’ipotesi nulla H0. I due modelli sono equivalenti.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+glm.logit.fit.ridotto1 <- glm(Term.Deposit ~ ., data = subset(train_set, select = -c(default)),
+family=binomial(link="logit"))
+
+anova(glm.logit.fit.ridotto1, glm.logit.fit, test = "LRT")
+
+```
+
+Eseguiamo il test LRT (Likelihood-Ratio-Test) prendendo in considerazione il modello ridotto stimato in precedenza.
+
+Aggiungendo una alla volta le varie variabili esplicative, notiamo come la devianza si riduca di molto quando all’interno del modello aggiungiamo una variabile che ha un impatto significativo sulla variabile dipendente.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+anova(glm.logit.fit.ridotto1, test = "LRT")
+```
+
+Stimiamo un'ulteriore modello in cui le variabili esplicative day e previous sono escluse dal modello precedente.
+
+Confrontiamo il modello completo con il modello ridotto grazie al test LRT per modelli NESTED.
+
+
+Il p-value (0.3166) è maggiore del livello di significatività $\alpha$ fissato al 5%, quindi non possiamo rigettare l’ipotesi Nulla H0.
+
+I due modelli sono equivalenti. Per il principio di parsimonia scegliamo il modello ristretto.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+glm.logit.fit.ridotto2 <- glm(Term.Deposit ~ ., data = subset(train_set, select = -c(default,day, previous)),
+family=binomial(link="logit"))
+
+anova(glm.logit.fit.ridotto2, glm.logit.fit, test = "LRT")
+```
+
+Eseguiamo il test LRT (Likelihood-Ratio-Test) prendendo in considerazione il modello ridotto stimato in precedenza.
+
+Questo è il modello scelto durante la fase di model selection.
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE,fig.align='center'}
+anova(glm.logit.fit.ridotto2, test = "LRT")
+```
+
+
+</div>
+
+
+<div id="INTERPRETAZIONE" class="section level1">
+
+# Interpretazione dei coefficienti
+
+Prendiamo in considerazione alcune variabili esplicative.
+
+
+**personal_loan = -43.5380054**
+
+A parità di tutte le altre condizioni (ceteris paribus), quando passiamo da  no_personal_loan a personal_loan, l'odds diminuisce del 43%.
+
+Questo è ragionevole in quanto personal_loan rappresenta un osservazione che ha richiesto un prestito alla banca. Chi non richiede un prestito magari presenta una maggiore liquidità e una parte di essa può essere depositata. 
+
+**educationtertiary = 46.9296477**
+
+A parità di tutte le altre condizioni (ceteris paribus), quando passiamo da educationsecondary a educationtertiary, l'odds aumenta del 46% rispetto a coloro che hanno un livello di educazione primario.
+
+Questo è ragionevole considerando il livello di educazione superiore.
+
+ 
+**no_housing_loan = 121.3473400**
+
+A parità di tutte le altre condizioni (ceteris paribus), quando passiamo da housing_loan a no_housing_loan, l'oods aumenta del 121%.
+
+
+Questo è ragionevole in quanto housing_loan rappresenta un mutuatario.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+# (exp(coef(glm.logit.fit.ridotto2))-1)*100
+
+
+coefficienti <- (exp(coef(glm.logit.fit.ridotto2))-1)*100
+
+coefficients_df <- data.frame(coefficienti = coefficienti, variable = names(coefficienti))
+
+# Aggiungi una colonna per indicare il segno del coefficiente
+
+coefficients_df$Segno <- ifelse(coefficients_df$coefficienti >= 0, "Positivo", "Negativo")
+
+# Barplot con ggplot2
+ggplot(coefficients_df, aes(x = reorder(variable, coefficienti), y = coefficienti, fill = Segno)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_fill_manual(values = c("Positivo" = "skyblue", "Negativo" = "salmon")) +
+  labs(title = "Impatto percentuale delle variabili sull'odds") +
+  xlab("Variabile")  + ylab("Impatto percentuale")+ theme_bw() + coord_flip() + labs(caption="Figura 7: Diagramma a barre dell'impatto percentuale delle variabili sull'odds")  + theme(plot.caption=element_markdown(hjust=0))
+
+```
+
+</div>
+
+
+<div id="VALIDAZIONE" class="section level1">
+
+# Validazione - Confronto  hold out CV  con ten-fold CV
+
+Applichiamo una ten-fold cross-validation (con k = 10). Nella
+k-fold cross-validation dividiamo il training set in k fold di grandezza pressoché identica.
+Nel primo step, il primo fold assumerà il ruolo di test set, mentre i restanti k − 1 fold
+svolgeranno il ruolo di training set. Il modello verrà addestrato sui k − 1 fold e successivamente verrà testato sui dati unseen, che in questo caso sono rappresentati dal primo fold.
+
+Dato che il nostro task è un problema di classificazione, verrà utilizzata come metrica di performance il tasso di accurata classificazione.
+
+La logica per gli step successivi è la medesima. Nell’ultimo step, l’ultimo fold assumerà il ruolo di test set mentre i restanti k − 1 fold svolgeranno il ruolo di training set.
+
+Alla fine del processo avremo k metriche di performance ognuna relativa ai k step effettuati. Le k metriche di performance verranno aggregate per ottenere un’unica metrica finale.
+
+Nei vari step della k-fold cross-validation le osservazioni a turno faranno parte sia dei dati
+di addestramento sia dei dati unseen.
+
+In questo caso l'accuratezza in cross-validation è pari all'90%, ovvero 90 volte su 100 classifichiamo correttamente le osservazioni rispetto alla loro vera classe di appartenenza. 
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+library(caret)
+
+# Crea il controllo per la cross-validation
+
+controllo <- trainControl(method = "cv", number = 10)
+
+# Esegui la cross-validation con la regressione logistica normale
+
+set.seed(300399)
+
+train_set <- as.data.frame(train_set)
+
+test_set <- as.data.frame(test_set)
+
+modello <- train(as.data.frame(train_set)[,-16], as.data.frame(train_set)$Term.Deposit, method = "glm", family = binomial(link = "logit"), trControl = controllo)
+
+modello
+```
+
+
+
+Ora, prendendo in considerazione i due modelli scelti tramite procedura di hold out cross-validation e ten-fold cross-validation, andiamo a prevedere la classe di appartenenza delle osservazioni incluse nel test set.
+
+Confronteremo le metriche di performance dei due modelli per vedere quale dei due si adatta meglio ai dati di test set.
+
+Le metriche di performance prese in considerazione sono il tasso di accurata classificazione e il suo complemento a uno, ovvero il Misclassification Rate.
+
+Dalla tabella notiamo performance molto simili.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+library(kableExtra)
+calc_acc = function(actual, predicted) {
+  mean(actual == predicted)
+}
+
+previsione_modello_senza_cv <- predict(glm.logit.fit.ridotto2, newdata = test_set, type = "response")
+
+classificazione_modello_senza_cv <- factor(ifelse(previsione_modello_senza_cv > 0.5,"TermDeposit","No_TermDeposit"))
+
+
+Accuracy_modello_senza_cv <- calc_acc(actual = test_set$Term.Deposit,
+         predicted = classificazione_modello_senza_cv)
+
+
+Accuracy_modello_con_cv <- calc_acc(actual = test_set$Term.Deposit,
+         predicted = predict(modello, newdata = test_set))
+
+
+
+performance_test_set <- data.frame(
+  Metrica = c("Accuracy", "MC Rate"),
+  Senza_CV = c(Accuracy_modello_senza_cv, 1-Accuracy_modello_senza_cv),
+  Con_CV = c(Accuracy_modello_con_cv, 1-Accuracy_modello_con_cv)
+)
+
+
+# tabella_performance_test_set <- kable(performance_test_set, row.names = TRUE, col.names = c("Metrica","Senza_CV", "Con_CV"),format = "html", space = "   ")
+
+kable(performance_test_set, format = "html", escape = FALSE, caption = "<center>Tabella1: Metriche di performance per il logit </center>") %>%
+  kable_styling(bootstrap_options = "striped", full_width = FALSE)
+```
+
+
+</div>
+
+
+<div id="MARGINAL" class="section level1">
+
+# Marginal effects
+
+Utilizziamo il modello scelto nella fase di model selection per calcolare gli effetti marginali.
+
+Consideriamo alcune variabili esplicative che possono influenzare la sottoscrizione di un deposito a termine, ad esempio la durata dell’ultimo contatto.
+
+Come si può immaginare, la durata del contatto
+rappresenta un fattore che può giocare un ruolo chiave nella sottoscrizione di un deposito, in
+quanto la banca in pochi minuti deve spronare il cliente ad avviare un possibile investimento. 
+
+La probabilità prevista di sottoscrizione di un deposito a termine è maggiore per valori maggiori di duration.  
+
+Il risultato è ragionevole in quanto chi è interessato ad un eventuale sottoscrizione di un deposito a termine tende a chiedere maggiori informazioni alla banca.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+library(ggeffects)
+mf1 <- ggpredict(glm.logit.fit.ridotto2,term=c("duration[all]"))
+plot(mf1) +  labs(caption="Figura 8: Probabilità previste per Term Deposit considerando la variabile duration")  + theme(plot.caption=element_markdown(hjust=0)) + ggtitle("Probabilità previste per Term Deposit")
+```
+
+Consideriamo ora le variabili categoriali job sector ed education.
+
+Gli studenti con un livello di educazione terziario presentano la probabilità prevista maggiore di sottoscrizione di un deposito a termine.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+mf2 <- ggpredict(glm.logit.fit.ridotto2,term=c("Job.Sector[all]", "education[primary,secondary,tertiary]"))
+plot(mf2) +  labs(caption="Figura 9: Probabilità previste per Term Deposit considerando le variabili job sector ed education")  + theme(plot.caption=element_markdown(hjust=0)) + ggtitle("Probabilità previste per Term Deposit")
+```
+
+
+Consideriamo ora le variabili categoriali housing e marital status.
+
+Le persone non sposate e che non hanno un mutuo presentano la probabilità prevista maggiore di sottoscrizione di un deposito a termine.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+mf3 <- ggpredict(glm.logit.fit.ridotto2,term=c("housing[all]","Marital.Status"))
+plot(mf3) +  labs(caption="Figura 10: Probabilità previste per Term Deposit considerando le variabili housing e marital status")  + theme(plot.caption=element_markdown(hjust=0)) + ggtitle("Probabilità previste per Term Deposit")
+```
+
+Infine, consideriamo le variabili categoriali housing e loan.
+
+Le persone che non hanno richiesto un prestito personale alla banca e che non hanno un mutuo presentano la probabilità prevista maggiore di sottoscrizione di un deposito a termine.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+mf4 <- ggpredict(glm.logit.fit.ridotto2,term=c("loan[all]", "housing[all]"))
+plot(mf4) +  labs(caption="Figura 11: Probabilità previste per Term Deposit considerando le variabili housing e loan")  + theme(plot.caption=element_markdown(hjust=0)) + ggtitle("Probabilità previste per Term Deposit")
+```
+
+
+</div>
+
+
+<div id="CLASSISBILANCIATE" class="section level1">
+
+
+
+# Problema delle classi sbilanciate 
+
+Nella prima parte del caso studio grazie al diagramma a barre abbiamo notato lo sbilanciamento delle classi a favore di No_TermDeposit, in particolare quasi il 90% delle osservazioni non ha sottoscritto un deposito a termine.
+
+Quando abbiamo classi sbilanciate, il modello tende ad apprendere meglio la classe dominante a scapito della classe minoritaria. Di conseguenza, il modello potrebbe non essere in grado di fare previsioni accurate per gli esempi della classe minoritaria. 
+
+L’obiettivo cardine è quello d’implementare il miglior modello di classificazione, in questo caso quel modello che riesca a classificare con un certo grado di accuratezza coloro che hanno sottoscritto un deposito a termine.
+
+Analizzando la confusion matrix il problema descritto viene a galla.
+
+Dando uno sguardo alla Sensitivity, ovvero il numero di veri positivi diviso per la somma di veri positivi e falsi negativi, abbiamo una misura della capacità del modello di "catturare" tutti gli esempi della classe minoritaria. 
+
+In questo caso essa è pari al 31%. 
+
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+library(caret)
+
+confusionMatrix(data = factor(predict(modello, newdata = test_set)), reference = test_set$Term.Deposit, positive = "TermDeposit")
+```
+
+
+</div>
+
+
+<div id="CLOGLOG" class="section level1">
+
+
+
+
+# Modello cloglog 
+
+Il modello cloglog può essere utilizzato per problemi di classificazione come nel nostro caso, inoltre può essere utile in caso di sbilanciamento delle classi, tuttavia lo sbilanciamento non deve essere troppo severo come nel nostro caso. La situazione "ottimale" è 60-40% o 70-30%.
+
+La link function utilizzata è la seguente: log(-log(1-p)) = $\eta$
+
+Applichiamo una ten-fold cross-validation (con k = 10) considerando il training set e utilizziamo il modello scelto per la fase di validazione sul test set.
+
+Dando uno sguardo alle altre metriche di performance, ad esempio la Sensitivity, notiamo come il modello riesca a “catturare” un numero maggiore di osservazioni che hanno veramente sottoscritto un deposito a termine.
+
+In precedenza la Sensitivity era pari al 31%, ora essa è pari al 38%.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+
+limite_inferiore <- quantile(train_set$duration, probs = 0.05)
+
+limite_superiore <- quantile(train_set$duration, probs = 0.95)
+
+idx <- which(train_set$duration < limite_inferiore | train_set$duration > limite_superiore)
+
+train_set_cloglog <- train_set[-idx,]
+
+
+modello_cloglog <- train(train_set_cloglog[,-16] , train_set_cloglog$Term.Deposit, method = "glm", family = binomial(link="cloglog"), trControl = controllo)
+
+previsione_modello_cloglog <- predict(modello_cloglog, newdata = test_set, type = "raw")
+
+# classificazione_modello_cloglog <- factor(ifelse(previsione_modello_cloglog[,2] > 0.5,"TermDeposit","No_TermDeposit"))
+
+confusionMatrix(data = factor(predict(modello_cloglog, newdata = test_set)), reference = test_set$Term.Deposit, positive = "TermDeposit")
+
+
+```
+
+
+# Curva ROC
+
+La sensibilità (Sensitivity) e la specificità (Specificity) classificano gli
+utenti sulla base di un predefinito valore soglia, la curva ROC invece viene costruita considerando tutti i possibili valori soglia e per ognuno di questi si calcola la sensibilità e la
+proporzione di falsi positivi data dalla formula 1 – specificità. 
+
+Congiungendo i vari punti che evidenziano la proporzione di veri positivi e di falsi positivi (coordinate) si ottiene una curva chiamata curva ROC.
+
+L’area sotto la curva ROC è detta AUC, ovvero Area Under the Curve. Più l’area sotto
+la curva è grande (quando la curva si avvicina al vertice del grafico in alto a sinistra) tanto
+maggiore è il potere discriminante. 
+
+Lungo la retta a 45 gradi ci sono i classificatori equivalenti al random guessing mentre sopra la retta a 45 gradi ci sono i classificatori migliori del random guessing, sotto quelli peggiori.
+
+Prendendo in considerazione il modello cloglog stimato, l'area sotto la curva ROC (l'AUC) è pari a 0.67.
+
+Secondo la classificazione proposta da Swets (1998), in questo caso il classificatore si può definire come "poco accurato" in quanto $0.5<AUC \leq 0.7$.
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+library(ROCit)
+
+term_deposit_numeric <- ifelse(test_set$Term.Deposit == "TermDeposit",1,0)
+
+pred_term_deposit_numeric<- as.integer(ifelse(predict(modello_cloglog, newdata = test_set) == "TermDeposit",1,0))
+
+roc_cloglog <- rocit(score = pred_term_deposit_numeric, class = term_deposit_numeric) 
+
+plot(roc_cloglog)
+```
+
+
+
+</div>
+
+
+
+
+<div id="LOGISTICAPESATA" class="section level1">
+
+
+
+# Regressione Logistica Pesata
+
+La regressione logistica pesata può essere utile quando si hanno classi sbilanciate e si desidera dare più peso alla classe minoritaria. 
+
+In questo caso creiamo un vettore di pesi in cui diamo un peso maggiore alla classe minoritaria, ovvero TermDeposit. Tale peso è fissato a 5, mentre per la classe maggioritaria esso è fissato a 1.
+
+Ora, considerando la regressione logistica pesata addestrata sui dati di training, andiamo a prevedere la classe d'appartenenza delle osservazioni che rientrano nel test set. 
+
+Le metriche di performance prese in considerazione sono sempre il tasso di accurata classificazione e il suo complemento a uno, ovvero il Misclassification Rate.
+
+Come possiamo vedere dalla tabella, il tasso di accurata classificazione è del 87%, in precedenza tale tasso era pari al 90%.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+# Supponiamo che tu abbia un dataset con una variabile di classe binaria "Class" e altre variabili predittive
+# Sostituisci "tuo_dataset" con il nome reale del tuo dataset
+# Sostituisci "tua_variabile_di_classe" con il nome reale della variabile di classe
+
+# Calcola i pesi per le classi
+# Ad esempio, assegniamo un peso 1 alla classe "negative" e un peso 5 alla classe "positive"
+
+weights <- ifelse(train_set$Term.Deposit == "No_TermDeposit", 1, 5)
+
+# Adatta il modello di regressione logistica con pesi
+
+model_lr <- glm(Term.Deposit ~ ., data = train_set, family = binomial(link="logit"), weights = weights)
+
+# Stampare un riepilogo del modello
+# summary(model_lr)
+
+```
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+previsione_modello_pesato<- predict(model_lr, newdata = test_set, type = "response")
+
+classificazione_modello_pesato <- factor(ifelse(previsione_modello_pesato > 0.5,"TermDeposit","No_TermDeposit"))
+
+
+Accuracy_modello_pesato <- calc_acc(actual = test_set$Term.Deposit,
+         predicted = classificazione_modello_pesato)
+
+
+performance_test_set_modello_pesato <- data.frame(
+  Metrica = c("Accuracy", "MC Rate"),
+  Modello_Pesato = c(Accuracy_modello_pesato, 1-Accuracy_modello_pesato))
+
+# tabella_performance_test_set_modello_pesato <- kable(performance_test_set_modello_pesato, row.names = TRUE, col.names = c("Metrica","Modello_Pesato"),format = "html", space = " ")
+
+kable(performance_test_set_modello_pesato, format = "html", escape = FALSE,  caption = "<center>Tabella2: Metriche di performance per il logit pesato </center>") %>%
+  kable_styling(bootstrap_options = "striped", full_width = FALSE)
+
+```
+
+
+Tuttavia nei problemi con classi sbilanciate, l'accuratezza può non essere una metrica sufficiente per valutare le prestazioni del modello, essa non tiene conto della distribuzione delle classi e può dare una visione distorta della bontà del modello, specialmente quando una delle classi è molto più frequente dell'altra.
+
+
+Dando uno sguardo alle altre metriche di performance, ad esempio la Sensitivity, notiamo come il modello riesca a "catturare" un numero maggiore di osservazioni che hanno veramente sottoscritto un deposito a termine.
+
+In precedenza la Sensitivity era pari al 31%, ora essa è pari al 68%.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+confusionMatrix(data = classificazione_modello_pesato, reference = test_set$Term.Deposit, positive = "TermDeposit")
+```
+
+Seguendo la stessa logica di prima, possiamo creare una griglia di pesi, e per ogni peso addestrare il modello sui dati di training e valutare l'accuratezza e la sensitività sui dati di test.
+
+Dal grafico notiamo come varia l'accuratezza e la sensitività sul test set per un dato peso.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+weights_seq <- seq(1,10,1)
+acc <- rep(0, length(weights_seq))
+sens <- rep(0, length(weights_seq))
+count <- 0
+while(count < 10){
+  for (w in weights_seq){
+    count <- count + 1 
+    weigh <- ifelse(train_set$Term.Deposit == "No_TermDeposit", 1, weights_seq[w]+1)
+    model <- glm(Term.Deposit ~ ., data = train_set, family = binomial(link="logit"), weights = weigh)
+    pred_modello_pesato<- predict(model, newdata = test_set, type="response")
+    class_modello_pesato <- factor(ifelse(pred_modello_pesato > 0.5,"TermDeposit","No_TermDeposit"))
+    acc_modello_pesato <- calc_acc(actual = test_set$Term.Deposit,
+         predicted = class_modello_pesato)
+    acc[w] <- acc_modello_pesato
+    tab <- table(classi_previste = class_modello_pesato, classi_vere = test_set$Term.Deposit)
+    sens[w] <- (tab[2,2] / (tab[2,2] + tab[1,2]))
+    
+  }
+}
+
+peso_acc_sens <- data.frame("Peso" = factor(weights_seq), "Accuracy" = acc, "Sensitivity" = sens)
+
+
+# Trasforma il dataset in formato "long" con la funzione gather di tidyr
+
+library(tidyr)
+
+peso_acc_sens_long <- gather(peso_acc_sens, key = "Variabile", value = "Valore", -Peso)
+
+grafico_barplot <- ggplot(peso_acc_sens_long, aes(x = Peso, y = Valore, fill = Variabile)) +
+  geom_col(position = "dodge", color = "black", width = 0.7) +
+  labs(title = "Peso vs Accuracy & Sensitivity", y = "Valore", fill = "Variabile") +
+  theme_bw()
+
+
+grafico_barplot +  labs(caption="Figura 12: Valore dell'accuratezza e della sensitività rispetto ai pesi")  + theme(plot.caption=element_markdown(hjust=0)) + ggtitle("Peso vs Accuratezza & Sensitività")
+```
+
+</div>
+
+
+<div id="ELASTICNET" class="section level1">
+
+# Regressione Logistica Penalizzata
+
+Ci sono alcuni approcci per eseguire automaticamente la selezione delle variabili. Un
+approccio utilizzato è quello dello shrinkage o anche regularization, che prevede l’adattamento di un modello con tutti i predittori, ma dove i coefficienti stimati sono ridotti a zero
+rispetto alle stime classiche. Di conseguenza la varianza del modello costruito si riduce e la
+stima di alcuni dei coefficienti sarà pari a 0, in modo tale da individuare quali variabili sono
+irrilevanti per il fenomeno oggetto dell’analisi.
+
+
+Gli approcci Ridge e Lasso, due dei principali metodi di regressione penalizzata, gestiscono il trade-off tra bias e variance, scambiando un piccolo aumento in bias (distorsione)
+con una grande diminuzione della varianza delle previsioni, quindi questo approccio potrebbe migliorare l’accuratezza complessiva della previsione.
+
+
+Una soluzione intermedia alle due  è rappresentata dalla regressione Elastic Net la quale combina le proprietà delle regressioni Ridge e Lasso penalizzando il modello sia tramite la norma L1 che la norma L2.
+
+
+Applichiamo una ten-fold cross-validation prendendo in considerazione tre possibili valori di $\alpha$, 0.10,0.55 ed 1 e tre possibili valori per $\lambda$.  Per una data coppia di valori ($\alpha$, $\lambda$) avremo l'accuratezza media in cross-validation.
+
+I parametri di tuning scelti sono: $\alpha = 0.1$ e $\lambda = 0.0002487212$.
+
+L'Elastic Net è un metodo più flessibile in quanto possiamo in modo elastico avvicinarci alla soluzione LASSO, oppure alla soluzione RIDGE a seconda del parametro alfa considerato. Per $\alpha$ = 0 abbiamo uno stimatore RIDGE mentre per $\alpha$ = 1, abbiamo uno stimatore LASSO. 
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+def_elnet = train(
+  Term.Deposit~ ., data = train_set,
+  method = "glmnet",
+  trControl = controllo
+)
+def_elnet
+```
+
+# Validazione
+
+Dalla confusion matrix notiamo performance molto simili alla regressione logistica non penalizzata.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+confusionMatrix(data = factor(predict(def_elnet, newdata = test_set)), reference = test_set$Term.Deposit, positive = "TermDeposit")
+```
+
+</div>
+
+
+<div id="RIEPILOGO" class="section level1">
+
+
+
+# Riepilogo finale  - Metriche di performance  dei vari modelli
+
+In questo riepilogo finale consideriamo come metriche di performance anche l'MCC e l'AUC.
+
+L'MCC, ovvero il coefficiente di Correlazione di Matthew(MCC), rappresenta il coefficiente di correlazione tra classi osservate e previste.
+
+Ha valori sull’intervallo $[-1,+1]$. Un MCC che tende a +1 indica una previsione perfetta mentre
+un MCC che tende a -1 indica un totale disaccordo tra le classi previste e quelle osservate. Un MCC vicino a 
+0 indica una classificazione non migliore del “random guess”.
+
+Il coefficiente di correlazione di matthew è utile quando si hanno classi fortemente sbilanciate, inoltre a differenza
+dell’accuratezza e dell’F-score, tiene conto di tutti e quattro i casi mostrati nella matrice di
+confusione.
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE,fig.align='center'}
+library(mltools)
+
+mcc_logit <- mcc(factor(predict(modello, newdata = test_set)), test_set$Term.Deposit)
+
+mcc_cloglog <- mcc(factor(predict(modello_cloglog, newdata = test_set)), test_set$Term.Deposit)
+
+mcc_logit_pesato <- mcc(classificazione_modello_pesato, test_set$Term.Deposit)
+
+mcc_logit_penalizzato <- mcc(factor(predict(def_elnet, newdata = test_set)), test_set$Term.Deposit)
+
+library(MLmetrics)
+
+# F1_Score_logit <- F1_Score(test_set$Term.Deposit,factor(predict(modello, newdata = test_set)), positive = "TermDeposit")
+
+# F1_Score_cloglog <-  F1_Score(test_set$Term.Deposit,factor(predict(modello_cloglog, newdata = test_set)), positive = "TermDeposit")
+
+
+# F1_Score_logit_pesato <-  F1_Score(test_set$Term.Deposit,classificazione_modello_pesato, positive = "TermDeposit")
+
+
+# F1_Score_logit_penalizzato <-  F1_Score(test_set$Term.Deposit,factor(predict(def_elnet, newdata = test_set)), positive = "TermDeposit")
+
+pred_term_deposit_numeric_logit <- as.integer(ifelse(predict(modello, newdata = test_set) == "TermDeposit",1,0))
+
+roc_logit <- rocit(score = pred_term_deposit_numeric_logit, class = term_deposit_numeric) 
+
+
+pred_term_deposit_numeric_logit_pesato <- as.integer(classificazione_modello_pesato == "TermDeposit",1,0)
+
+roc_logit_pesato <- rocit(score = pred_term_deposit_numeric_logit_pesato, class = term_deposit_numeric) 
+
+
+pred_term_deposit_numeric_logit_penalizzato <-  as.integer(ifelse(predict(def_elnet, newdata = test_set) == "TermDeposit",1,0))
+
+roc_logit_penalizzato <- rocit(score = pred_term_deposit_numeric_logit_penalizzato, class = term_deposit_numeric) 
+
+
+# roc_logit$AUC  -> 0.647
+
+# roc_cloglog$AUC -> 0.67
+
+# roc_logit_pesato$AUC -> 0.78
+
+# roc_logit_penalizzato$AUC -> 0.644
+
+riepilogo_finale <- data.frame("Accuracy" = c(0.9063,0.9074,0.8742,0.9062),
+                               "Sensitivity" = c(0.31864,0.38384,0.68044,0.31589),
+                               "Specificity" = c(0.97678, 0.97018,0.89744, 0.97700),
+                               "MCC" = c(0.40,0.33,0.48,0.39),
+                               "AUC" = c(0.647,0.67, 0.78,0.644))
+
+rownames(riepilogo_finale) <- c("Logit","Cloglog","Logit Pesato","Logit Penalizzato")
+
+kable(riepilogo_finale, format = "html", escape = FALSE,  caption = "<center>Tabella3: Metriche di performance dei vari modelli</center>") %>%
+  kable_styling(bootstrap_options = "striped", full_width = FALSE)
+
+```
+
+
+</div>
+
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+# save.image("ambiente_lavoro_BankMarketing.RData")
+# write.csv(train_set_airbnb_Rome_mescolato,"train_set_airbnb_Rome_mescolato.csv")
+# write.csv(test_set_airbnb_Rome_mescolato, "test_set_airbnb_Rome_mescolato.csv")
+```
