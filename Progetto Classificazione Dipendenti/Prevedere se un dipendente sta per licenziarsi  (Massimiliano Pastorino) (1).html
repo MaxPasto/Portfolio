@@ -14577,7 +14577,7 @@ body[data-format='mobile'] .jp-OutputArea-child .jp-OutputArea-output {
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[196]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[4]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
      <div class="CodeMirror cm-s-jupyter">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">IPython.display</span> <span class="kn">import</span> <span class="n">display</span><span class="p">,</span> <span class="n">HTML</span>
@@ -14945,7 +14945,7 @@ memory usage: 1.1+ MB
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<p>Trasformiamo alcune feature in tipo categoriale</p>
+<p>Trasformiamo alcune features in tipo categoriale</p>
 
 </div>
 </div>
@@ -17279,17 +17279,12 @@ salary_medium               1.5831      0.199      7.957      0.000       1.193 
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
 <p>Commento variabili numeriche</p>
 <p>satisfaction_level -&gt; coef -3.9478</p>
-<p>Possiamo dire che, ceteris paribus,</p>
-<p>un incremento unitario nella soddisfazione del dipendente riduce l’odds di y=1 (licenziamento)</p>
-<p>di un fattore di circa 0.019 (exp(-3.9478)). Più il dipendente è soddisfatto menò sarà probabile il licenziamento.</p>
+<p>Possiamo dire che, ceteris paribus, un incremento unitario nella soddisfazione del dipendente riduce l’odds di y=1 (licenziamento) 
+di un fattore di circa 0.019 (exp(-3.9478)). Più il dipendente è soddisfatto menò sarà probabile il licenziamento.</p>
 <p>average_montly_hours -&gt; coef 0.0041</p>
-<p>Possiamo dire che, ceteris paribus, un incremento unitario del numero di ore mensili lavorative, aumenta l'odds di</p>
-<p>y=1 (licenziamento) di un fattore di circa 1.004 (exp(0.0041)).</p>
+<p>Possiamo dire che, ceteris paribus, un incremento unitario del numero di ore mensili lavorative, aumenta l'odds di y=1 (licenziamento) di un fattore di circa 1.004 (exp(0.0041)).</p>
 <p>Commento variabili categoriali</p>
-<p>promotion_last_5years_1  -&gt; coef  -1.0861. La categoria base è 0,ovvero quei dipendenti che negli ultimi 5 anni non</p>
-<p>hanno ricevuto una promozione. Ceteris paribus, i dipendenti che hanno ricevuto una promozione negli ultimi 5 anni presentano</p>
-<p>una riduzione dell' odds di y=1 (licenziamento) di un fattore che è pari a exp(-1.0861), ovvero 0.33 rispetto ai dipendenti</p>
-<p>che non hanno ricevuto una promozione negli ultimi 5 anni.</p>
+<p>promotion_last_5years_1  -&gt; coef  -1.0861. La categoria base è 0,ovvero quei dipendenti che negli ultimi 5 anni non hanno ricevuto una promozione. Ceteris paribus, i dipendenti che hanno ricevuto una promozione negli ultimi 5 anni presentano una riduzione dell' odds di y=1 (licenziamento) di un fattore che è pari a exp(-1.0861), ovvero 0.33 rispetto ai dipendenti che non hanno ricevuto una promozione negli ultimi 5 anni.</p>
 
 </div>
 </div>
@@ -17494,14 +17489,10 @@ AUC ROC: 0.582
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
 <p>Commento metriche di performance</p>
 <p>L'accuratezza ci dice che 83/100 volte il classificatore classifica correttamente l'osservazione i-esima. 83% di accuratezza.</p>
-<p>Recall -&gt; 0.207 Rappresenta il rapporto tra VERI POSITIVI / (VERI POSITIVI + FALSI NEGATIVI) = 103 / (103+395), rappresenta</p>
-<p>la frazione di (veri) positivi correttamente classificati. Per veri positivi si intende i dipendenti che veramente si sono</p>
-<p>licenziati.</p>
-<p>Precision -&gt; 0.493 Rappresenta il rapporto tra VERI POSITIVI e i POSITIVI classificati dal modello di regressione logistica,</p>
-<p>quindi 103 / (103+106). Rappresenta una misura di esattezza/fedeltà del classificatore.</p>
+<p>Recall -&gt; 0.207 Rappresenta il rapporto tra VERI POSITIVI / (VERI POSITIVI + FALSI NEGATIVI) = 103 / (103+395), rappresenta la frazione di (veri) positivi correttamente classificati. Per veri positivi si intende i dipendenti che veramente si sono licenziati.</p>
+<p>Precision -&gt; 0.493 Rappresenta il rapporto tra VERI POSITIVI e i POSITIVI classificati dal modello di regressione logistica, quindi 103 / (103+106). Rappresenta una misura di esattezza/fedeltà del classificatore.</p>
 <p>F1 Score -&gt; 0.291 Rappresenta una "media armonica" di Precision e Recall. Un alto valore di F1 indica una buona performance.</p>
-<p>Dalle metriche di performance possiamo notare come il classificatore in realtà non sia cosi preciso nel classificare</p>
-<p>correttamente i veri positivi, ovvero i dipendenti che veramente si sono licenziati.</p>
+<p>Dalle metriche di performance possiamo notare come il classificatore in realtà non sia cosi preciso nel classificare correttamente i veri positivi, ovvero i dipendenti che veramente si sono licenziati.</p>
 
 </div>
 </div>
@@ -17620,9 +17611,7 @@ SI CALCOLA L'ACCURACY MEDIA.</p>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<p>Il modello scelto presenta le seguenti caratteristiche: Profondità dell'albero -&gt; 10, min_samples_split: 10 -&gt; ovvero</p>
-<p>il numero minimo di osservazioni per cui decidere effettivamente se fare un'ulteriore split o meno è 10 osservazioni,</p>
-<p>min_samples_leaf: 2 -&gt; Il numero di osservazioni minimo presenti nelle foglie è 2.</p>
+<p>Il modello scelto presenta le seguenti caratteristiche: Profondità dell'albero -&gt; 10, min_samples_split: 10 -&gt; ovvero il numero minimo di osservazioni per cui decidere effettivamente se fare un'ulteriore split o meno è 10 osservazioni, min_samples_leaf: 2 -&gt; Il numero di osservazioni minimo presenti nelle foglie è 2.</p>
 <p>Criterio utilizzato per valutare l'impurità delle foglie, dato uno split, è il criterio di gini.</p>
 
 </div>
@@ -17755,8 +17744,7 @@ AUC ROC: 0.961
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<p>Tutte le metriche di performance dell'albero di decisione sono nettamente superiori rispetto alle metriche di performance</p>
-<p>della regressione logistica.</p>
+<p>Tutte le metriche di performance dell'albero di decisione sono nettamente superiori rispetto alle metriche di performance della regressione logistica.</p>
 <p>TRA L'ALBERO DI DECISIONE E IL CLASSIFICATORE CHE SCATURISCE DALLA REGRESSIONE LOGISTICA, SCEGLIAMO L'ALBERO DI DECISIONE.</p>
 
 </div>
@@ -17952,8 +17940,8 @@ jp-needs-light-background
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<p>Nel primo caso la classe assegnata è No Licenziamento con probabilità 1</p>
-<p>Nel secondo caso la classe assegnata e Licenziamento con probabilità 1</p>
+<p>Nel primo caso la classe assegnata è "No Licenziamento" con probabilità 1.</p>
+<p>Nel secondo caso la classe assegnata è "Licenziamento" con probabilità 1.</p>
 
 </div>
 </div>
@@ -18020,11 +18008,8 @@ Name: left, dtype: int64</pre>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<p>LO SBILANCIAMENTO DELLE CLASSI PUO INFLUIRE SUL CLASSIFICATORE IN QUANTO GRAZIE AL MAGGIOR NUMERO DI ESEMPI (IN QUESTO CASO</p>
-<p>DIPENDENTI CHE NON SI SONO LICENZIATI) IL CLASSIFICATORE PUÒ FARE PIU FATICA A RICONOSCERE LA CLASSE MINORITARIA, IN QUESTO</p>
-<p>CASO I DIPENDENTI CHE SI SONO LICENZIATI.</p>
-<p>Il rischio è che il classificatore diventi poco sensibile alla classe minoritaria,</p>
-<p>riducendo la capacità di riconoscere chi effettivamente si licenzia.</p>
+<p>LO SBILANCIAMENTO DELLE CLASSI PUÒ INFLUIRE SUL CLASSIFICATORE IN QUANTO GRAZIE AL MAGGIOR NUMERO DI ESEMPI (IN QUESTO CASO DIPENDENTI CHE NON SI SONO LICENZIATI) IL CLASSIFICATORE PUÒ FARE PIU FATICA A RICONOSCERE LA CLASSE MINORITARIA, IN QUESTO  CASO I DIPENDENTI CHE SI SONO LICENZIATI.</p>
+<p>Il rischio è che il classificatore diventi poco sensibile alla classe minoritaria, riducendo la capacità di riconoscere chi effettivamente si licenzia.</p>
 <p>UNA TECNICA CHE PUO ESSERE UTILIZZATA -&gt; SMOTE</p>
 
 </div>
@@ -18122,8 +18107,7 @@ Distribuzione test: Counter({0: 2500, 1: 498})
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<p>IN QUESTO CASO, VENGONO GENERATI ESEMPI SINTETICI DELLA CLASSE MINORITARIA</p>
-<p>GRAZIE ALL'INTERPOLAZIONE DI ESEMPI REALI VICINI NELLO SPAZIO DELLE FEATURE</p>
+<p>IN QUESTO CASO, VENGONO GENERATI ESEMPI SINTETICI DELLA CLASSE MINORITARIA GRAZIE ALL'INTERPOLAZIONE DI ESEMPI REALI VICINI NELLO SPAZIO DELLE FEATURE</p>
 
 </div>
 </div>
@@ -18135,8 +18119,7 @@ Distribuzione test: Counter({0: 2500, 1: 498})
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<p>CONSIDERIAMO IL MODELLO DI REGRESSIONE LOGISTICA</p>
-<p>INOLTRE QUESTA VOLTA, STANDARDIZZIAMO LE FEATURE NUMERICHE</p>
+<p>CONSIDERIAMO IL MODELLO DI REGRESSIONE LOGISTICA INOLTRE QUESTA VOLTA, STANDARDIZZIAMO LE FEATURES NUMERICHE</p>
 
 </div>
 </div>
@@ -19155,12 +19138,8 @@ AUC ROC: 0.731
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<p>QUESTI RISULTATI MOSTRANO CHE, NONOSTANTE UNA LEGGERA RIDUZIONE DELL’ACCURACY E DELLA PRECISION,</p>
-<p>L’USO DI SMOTE ABBINATO ALLA STANDARDIZZAZIONE HA PERMESSO UN NOTEVOLE MIGLIORAMENTO DELLA CAPACITÀ DEL MODELLO DI</p>
-<p>RICONOSCERE LA CLASSE MINORITARIA, COME DIMOSTRATO DALL’AUMENTO DEL RECALL E DELL' AUC ROC.</p>
-<p>IN PARTICOLARE, L'AUMENTO DELL'F1 SCORE INDICA UN MIGLIOR EQUILIBRIO TRA PRECISION E RECALL,</p>
-<p>RENDENDO IL MODELLO PIÙ EFFICACE NEL RICONOSCIMENTO DELLE CLASSI SBILANCIATE.</p>
-<p>TUTTAVIA L'ALBERO DI DECISIONE STIMATO IN PRECEDENZA RAPPRESENTA LA SOLUZIONE MIGLIORE.</p>
+<p>QUESTI RISULTATI MOSTRANO CHE, NONOSTANTE UNA LEGGERA RIDUZIONE DELL’ACCURACY E DELLA PRECISION, L’USO DI SMOTE ABBINATO ALLA STANDARDIZZAZIONE HA PERMESSO UN NOTEVOLE MIGLIORAMENTO DELLA CAPACITÀ DEL MODELLO DI RICONOSCERE LA CLASSE MINORITARIA, COME DIMOSTRATO DALL’AUMENTO DEL RECALL E DELL' AUC ROC.</p>
+<p>IN PARTICOLARE, L'AUMENTO DELL'F1 SCORE INDICA UN MIGLIOR EQUILIBRIO TRA PRECISION E RECALL, RENDENDO IL MODELLO PIÙ EFFICACE NEL RICONOSCIMENTO DELLE CLASSI SBILANCIATE. TUTTAVIA L'ALBERO DI DECISIONE STIMATO IN PRECEDENZA RAPPRESENTA LA SOLUZIONE MIGLIORE.</p>
 
 </div>
 </div>
