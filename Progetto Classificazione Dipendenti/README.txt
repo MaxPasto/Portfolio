@@ -2,7 +2,7 @@
 
 # Visualizza il progetto online:
 
-https://maxpasto.github.io/Portfolio/Progetto%20Classificazione%20Dipendenti/Prevedere%20se%20un%20dipendente%20sta%20per%20licenziarsi%20%28Massimiliano%20Pastorino%29.html
+https://maxpasto.github.io/Portfolio/Progetto%20Classificazione%20Dipendenti/Prevedere%20se%20un%20dipendente%20sta%20per%20licenziarsi%20%20(Massimiliano%20Pastorino)%20(1).html
 
 ## Obiettivo
 
