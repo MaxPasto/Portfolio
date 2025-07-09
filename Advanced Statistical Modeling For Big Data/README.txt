@@ -2,9 +2,6 @@
 Questo progetto analizza un dataset proveniente da una campagna marketing condotta da un istituto bancario portoghese. 
 L'obiettivo principale è costruire un modello di classificazione in grado di prevedere se un cliente sottoscriverà un deposito a termine.
 
-📄 Visualizza il progetto online:
-https://maxpasto.github.io/Portfolio/Advanced%20Statistical%20Modeling%20For%20Big%20Data/BankMarketing%20dataset.html
-
 📊 Fonte dei dati: 
 https://archive.ics.uci.edu/ml/datasets/bank+marketing
 👉 UCI Machine Learning Repository – Bank Marketing Dataset
@@ -33,8 +30,6 @@ Parte 2 – Modellazione e Classificazione
 🏠 Airbnb Roma – Previsione del Prezzo di Prenotazione
 Questo progetto analizza un sottoinsieme del dataset Aemf1 per costruire un modello predittivo del prezzo di prenotazione degli annunci Airbnb a Roma, utilizzando variabili numeriche e categoriali.
 
-📄 Visualizza il progetto online:
-https://maxpasto.github.io/Portfolio/Advanced%20Statistical%20Modeling%20For%20Big%20Data/Airbnb%20Roma.html
 
 📊 Fonte dei dati:  https://www.kaggle.com/datasets/dipeshkhemani/airbnb-cleaned-europe-dataset
 👉 Kaggle – Airbnb Cleaned Europe Dataset

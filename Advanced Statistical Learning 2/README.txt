@@ -4,11 +4,6 @@ previsione mediante reti neurali.
 I due casi studio affrontano problematiche reali su dati economici e commerciali, sfruttando tecniche di apprendimento statistico avanzato.
 
 🔨 Caso Studio 1: Indice di Produzione delle Costruzioni – Italia e Francia
-📄 Visualizza il progetto online: 
-
-https://maxpasto.github.io/Portfolio/Advanced%20Statistical%20Learning%202/Indice%20di%20produzione%20delle%20costruzioni%20per%20Italia%20e%20Francia.html
-
-👉 Indice di produzione delle costruzioni – HTML
 
 📊 Fonte dei dati: https://ec.europa.eu/eurostat/databrowser/view/ei_isbu_m/default/table?lang=en
 👉 Eurostat – Indice produzione costruzioni
@@ -25,10 +20,6 @@ Le osservazioni tra gennaio 1995 e dicembre 2019 sono utilizzate per il training
 capacità previsive del modello.
 
 🚗 Caso Studio 2: Previsione del prezzo delle auto usate
-📄 Visualizza il progetto online:
-
- https://maxpasto.github.io/Portfolio/Advanced%20Statistical%20Learning%202/Vehicle%20dataset.html
-👉 Vehicle dataset – HTML
 
 📊 Fonte dei dati: https://www.kaggle.com/datasets/nehalbirla/vehicle-dataset-from-cardekho?select=Car+details+v3.csv
 👉 Kaggle – Vehicle Dataset
